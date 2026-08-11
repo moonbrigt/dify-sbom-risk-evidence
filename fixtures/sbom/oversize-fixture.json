@@ -1,0 +1,5 @@
+{
+  "fixture_type": "generated",
+  "description": "Tests create a JSON string larger than 2 MiB; the oversized payload is intentionally not committed.",
+  "generator": "tools/regression_suite.py::test_oversize_input_rejected"
+}

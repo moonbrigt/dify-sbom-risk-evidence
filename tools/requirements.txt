@@ -1,0 +1,4 @@
+# Offline regression suite + CI tooling
+PyYAML>=6.0,<7
+jsonschema>=4.10,<5
+ruff>=0.5,<1
