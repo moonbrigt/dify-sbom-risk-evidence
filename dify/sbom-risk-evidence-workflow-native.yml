@@ -1,0 +1,896 @@
+app:
+  description: 'CycloneDX/SPDX SBOM risk evidence: schema preflight, OSV query, CISA
+    KEV cross-reference, JSON/CSV export. No LLM.'
+  icon: 🧾
+  icon_background: '#E8F3FF'
+  mode: workflow
+  name: SBOM Risk Evidence 20260811 019fef
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+version: 0.3.1
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JSON
+      - .SPDX.JSON
+      - .CDX.JSON
+      allowed_file_types:
+      - document
+      allowed_file_upload_methods:
+      - local_file
+      enabled: true
+      fileUploadConfig:
+        audio_file_size_limit: 0
+        batch_count_limit: 1
+        file_size_limit: 2
+        image_file_size_limit: 0
+        number_limits: 1
+        video_file_size_limit: 0
+        workflow_file_upload_limit: 2
+      image:
+        enabled: false
+        number_limits: 0
+        transfer_methods: []
+      number_limits: 1
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+      type: ''
+      inputs: []
+      outputs: []
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    nodes:
+    - data:
+        desc: Accept exactly one local JSON document; remote URL upload is disabled.
+        selected: false
+        title: Upload SBOM
+        type: start
+        variables:
+        - allowed_file_extensions:
+          - .JSON
+          - .SPDX.JSON
+          - .CDX.JSON
+          allowed_file_types:
+          - document
+          allowed_file_upload_methods:
+          - local_file
+          label: SBOM file
+          max_length: null
+          options: []
+          required: true
+          type: file
+          variable: sbom_file
+      height: 86
+      id: start
+      position:
+        x: 80
+        y: 300
+      positionAbsolute:
+        x: 80
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1
+    - data:
+        desc: Convert the locally uploaded JSON document to text; no external reference
+          is fetched.
+        selected: false
+        title: Extract uploaded JSON
+        type: document-extractor
+        variable_selector:
+        - start
+        - sbom_file
+      height: 74
+      id: extract
+      position:
+        x: 400
+        y: 300
+      positionAbsolute:
+        x: 400
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1
+    - data:
+        code: "import json\nimport time\n\nMAX_BYTES = 2 * 1024 * 1024\nMAX_COMPONENTS\
+          \ = 1000\nKNOWN_ECOSYSTEMS = {\n    \"cargo\", \"composer\", \"deb\", \"\
+          golang\", \"hackage\", \"hex\", \"maven\",\n    \"npm\", \"nuget\", \"pypi\"\
+          , \"rubygems\", \"cran\", \"swift\", \"apk\", \"rpm\",\n    \"conan\", \"\
+          conda\", \"pub\", \"bioconductor\", \"linux\",\n}\n\ndef _purl_parts(purl):\n\
+          \    if not isinstance(purl, str) or not purl.startswith(\"pkg:\"):\n  \
+          \      return None\n    try:\n        rest = purl[4:]\n        ptype, _,\
+          \ remainder = rest.partition(\"/\")\n        if not remainder:\n       \
+          \     return None\n        name_part = remainder\n        version = None\n\
+          \        if \"@\" in name_part:\n            name_part, _, version = name_part.partition(\"\
+          @\")\n        return {\"type\": ptype.lower(), \"name\": name_part, \"version\"\
+          : version}\n    except Exception:\n        return None\n\ndef main(sbom_text:\
+          \ str) -> dict:\n    try:\n        size = len(sbom_text.encode(\"utf-8\"\
+          ))\n        if size > MAX_BYTES:\n            raise ValueError(\"INPUT_TOO_LARGE\"\
+          )\n        document = json.loads(sbom_text)\n        if not isinstance(document,\
+          \ dict):\n            raise ValueError(\"SBOM_INVALID\")\n        if document.get(\"\
+          bomFormat\") == \"CycloneDX\" and str(document.get(\"specVersion\")) ==\
+          \ \"1.6\":\n            doc_format = \"CycloneDX 1.6 JSON\"\n          \
+          \  raw = document.get(\"components\", [])\n            if not isinstance(raw,\
+          \ list):\n                raise ValueError(\"SBOM_INVALID\")\n         \
+          \   components = []\n            pending = list(raw)\n            while\
+          \ pending:\n                item = pending.pop(0)\n                if not\
+          \ isinstance(item, dict):\n                    raise ValueError(\"SBOM_INVALID\"\
+          )\n                children = item.get(\"components\", [])\n           \
+          \     if isinstance(children, list):\n                    pending[0:0] =\
+          \ children\n                components.append(item)\n        elif document.get(\"\
+          spdxVersion\") == \"SPDX-2.3\":\n            doc_format = \"SPDX 2.3 JSON\"\
+          \n            packages = document.get(\"packages\", [])\n            if\
+          \ not isinstance(packages, list):\n                raise ValueError(\"SBOM_INVALID\"\
+          )\n            components = list(packages)\n        else:\n            raise\
+          \ ValueError(\"SBOM_UNSUPPORTED\")\n        if len(components) > MAX_COMPONENTS:\n\
+          \            raise ValueError(\"TOO_MANY_COMPONENTS\")\n        normalized\
+          \ = []\n        for index, item in enumerate(components):\n            if\
+          \ not isinstance(item, dict):\n                raise ValueError(\"SBOM_INVALID\"\
+          )\n            name = item.get(\"name\")\n            if not isinstance(name,\
+          \ str) or not name:\n                raise ValueError(\"SBOM_INVALID\")\n\
+          \            version = item.get(\"version\")\n            if version is\
+          \ None:\n                version = item.get(\"versionInfo\")  # SPDX 2.3\
+          \ JSON names the field versionInfo\n            if version is not None and\
+          \ not isinstance(version, str):\n                version = str(version)\n\
+          \            purl = item.get(\"purl\") if isinstance(item.get(\"purl\"),\
+          \ str) else None\n            if purl is None:\n                for ref\
+          \ in item.get(\"externalRefs\", []) if isinstance(item.get(\"externalRefs\"\
+          , []), list) else []:\n                    if isinstance(ref, dict) and\
+          \ ref.get(\"referenceType\") == \"purl\" and isinstance(ref.get(\"referenceLocator\"\
+          ), str):\n                        purl = ref[\"referenceLocator\"]\n   \
+          \                     break\n            parsed = _purl_parts(purl) if purl\
+          \ else None\n            ecosystem = parsed[\"type\"] if parsed else None\n\
+          \            conflict = None\n            if parsed and parsed[\"version\"\
+          ] and version and parsed[\"version\"] != version:\n                conflict\
+          \ = \"purl version %s != declared version %s\" % (parsed[\"version\"], version)\n\
+          \            if ecosystem and ecosystem not in KNOWN_ECOSYSTEMS:\n     \
+          \           ecosystem = None\n            normalized.append({\n        \
+          \        \"index\": index,\n                \"name\": name,\n          \
+          \      \"version\": version,\n                \"purl\": purl,\n        \
+          \        \"ecosystem\": ecosystem,\n                \"conflict\": conflict,\n\
+          \                \"unknown_ecosystem\": ecosystem is None,\n           \
+          \ })\n        return {\n            \"valid\": True,\n            \"error_code\"\
+          : \"\",\n            \"doc_format\": doc_format,\n            \"processed_at\"\
+          : time.strftime(\"%Y-%m-%dT%H:%M:%SZ\", time.gmtime()),\n            \"\
+          components_json\": json.dumps(normalized, ensure_ascii=False, separators=(\"\
+          ,\", \":\")),\n        }\n    except ValueError as exc:\n        return\
+          \ {\n            \"valid\": False,\n            \"error_code\": str(exc),\n\
+          \            \"doc_format\": \"\",\n            \"processed_at\": \"\",\n\
+          \            \"components_json\": \"[]\",\n        }\n"
+        code_language: python3
+        desc: Parse, bound (2 MiB / 1000 components), and normalize components. Uploaded
+          fields are untrusted data.
+        outputs:
+          valid:
+            children: null
+            type: boolean
+          error_code:
+            children: null
+            type: string
+          doc_format:
+            children: null
+            type: string
+          processed_at:
+            children: null
+            type: string
+          components_json:
+            children: null
+            type: string
+        selected: false
+        title: Validate and normalize
+        type: code
+        variables:
+        - value_selector:
+          - extract
+          - text
+          value_type: string
+          variable: sbom_text
+      height: 84
+      id: preflight
+      position:
+        x: 720
+        y: 300
+      positionAbsolute:
+        x: 720
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1
+    - data:
+        code: "import json\n\ndef _versionless_purl(purl):\n    \"\"\"Strip a trailing\
+          \ @version from a purl, keeping scoped names like pkg:npm/@scope/name.\"\
+          \"\"\n    if \"@\" not in purl:\n        return purl\n    head, _sep, tail\
+          \ = purl.rpartition(\"@\")\n    if not head or not tail or \"/\" in tail:\n\
+          \        return purl\n    return head\n\ndef main(components_json: str)\
+          \ -> dict:\n    try:\n        components = json.loads(components_json)\n\
+          \    except Exception:\n        components = []\n    queries = []\n    skipped\
+          \ = []\n    for item in components:\n        if item.get(\"conflict\") or\
+          \ item.get(\"unknown_ecosystem\") or not item.get(\"purl\"):\n         \
+          \   skipped.append(item)\n            continue\n        version = item.get(\"\
+          version\") or \"\"\n        query = {\"package\": {\"purl\": _versionless_purl(item[\"\
+          purl\"])}, \"version\": version}\n        queries.append(query)\n    return\
+          \ {\n        \"querybatch_json\": json.dumps({\"queries\": queries}, ensure_ascii=False,\
+          \ separators=(\",\", \":\")),\n        \"queryable_count\": str(len(queries)),\n\
+          \        \"skipped_json\": json.dumps(skipped, ensure_ascii=False, separators=(\"\
+          ,\", \":\")),\n    }\n"
+        code_language: python3
+        desc: Build a bounded v1/querybatch request from normalized components; conflicts
+          and unknown ecosystems are skipped.
+        outputs:
+          querybatch_json:
+            children: null
+            type: string
+          queryable_count:
+            children: null
+            type: string
+          skipped_json:
+            children: null
+            type: string
+        selected: false
+        title: Build OSV query batch
+        type: code
+        variables:
+        - value_selector:
+          - preflight
+          - components_json
+          value_type: string
+          variable: components_json
+      height: 84
+      id: osv_query
+      position:
+        x: 1040
+        y: 300
+      positionAbsolute:
+        x: 1040
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1
+    - data:
+        authorization:
+          type: no-auth
+        body:
+          data:
+          - id: body-json-1
+            key: ''
+            type: text
+            value: '{{#osv_query.querybatch_json#}}'
+          type: json
+        desc: Official public OSV querybatch endpoint; no key. SBOM fields cannot
+          change URL, headers, or method.
+        error_strategy: fail-branch
+        headers: 'Content-Type: application/json'
+        method: POST
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 1000
+        selected: false
+        ssl_verify: true
+        timeout:
+          connect: 10
+          read: 60
+          write: 60
+        title: OSV querybatch (official API)
+        type: http-request
+        url: https://api.osv.dev/v1/querybatch
+      height: 126
+      id: osv_http
+      position:
+        x: 1360
+        y: 300
+      positionAbsolute:
+        x: 1360
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1
+    - data:
+        code: "import json\nimport time\n\ndef main(response_body: str, skipped_json:\
+          \ str, queryable_count: str) -> dict:\n    try:\n        queryable = int(queryable_count\
+          \ or 0)\n    except Exception:\n        queryable = 0\n    try:\n      \
+          \  payload = json.loads(response_body)\n        results = payload.get(\"\
+          results\")\n        if not isinstance(results, list):\n            raise\
+          \ ValueError(\"OSV_PROTOCOL_ERROR\")\n    except Exception:\n        return\
+          \ {\n            \"components_json\": \"[]\",\n            \"osv_queried_at\"\
+          : \"\",\n            \"osv_error\": \"OSV_PROTOCOL_ERROR\",\n          \
+          \  \"queryable_count\": str(queryable),\n            \"partial\": True,\n\
+          \        }\n    parsed = []\n    for index, result in enumerate(results):\n\
+          \        if not isinstance(result, dict):\n            parsed.append({\"\
+          index\": index, \"vulns\": [], \"error\": \"OSV_PROTOCOL_ERROR\"})\n   \
+          \         continue\n        vulns = result.get(\"vulns\", [])\n        items\
+          \ = []\n        if isinstance(vulns, list):\n            for vuln in vulns:\n\
+          \                if not isinstance(vuln, dict):\n                    continue\n\
+          \                vid = vuln.get(\"id\")\n                if not isinstance(vid,\
+          \ str):\n                    continue\n                aliases = vuln.get(\"\
+          aliases\", [])\n                items.append({\n                    \"id\"\
+          : vid,\n                    \"aliases\": aliases if isinstance(aliases,\
+          \ list) else [],\n                    \"summary\": vuln.get(\"summary\"\
+          ) if isinstance(vuln.get(\"summary\"), str) else None,\n               \
+          \     \"details\": vuln.get(\"details\") if isinstance(vuln.get(\"details\"\
+          ), str) else None,\n                    \"affected\": vuln.get(\"affected\"\
+          ) if isinstance(vuln.get(\"affected\"), list) else [],\n               \
+          \     \"modified\": vuln.get(\"modified\") if isinstance(vuln.get(\"modified\"\
+          ), str) else None,\n                })\n        parsed.append({\"index\"\
+          : index, \"vulns\": items, \"error\": None})\n    try:\n        skipped\
+          \ = json.loads(skipped_json)\n    except Exception:\n        skipped = []\n\
+          \    return {\n        \"components_json\": json.dumps(parsed, ensure_ascii=False,\
+          \ separators=(\",\", \":\")),\n        \"osv_queried_at\": time.strftime(\"\
+          %Y-%m-%dT%H:%M:%SZ\", time.gmtime()),\n        \"osv_error\": \"\",\n  \
+          \      \"queryable_count\": str(queryable),\n        \"partial\": False,\n\
+          \    }\n"
+        code_language: python3
+        desc: Map querybatch results back to components; protocol errors become per-component
+          unknown, never a safety claim.
+        outputs:
+          components_json:
+            children: null
+            type: string
+          osv_queried_at:
+            children: null
+            type: string
+          osv_error:
+            children: null
+            type: string
+          queryable_count:
+            children: null
+            type: string
+          partial:
+            children: null
+            type: boolean
+        selected: false
+        title: Parse OSV responses
+        type: code
+        variables:
+        - value_selector:
+          - osv_http
+          - body
+          value_type: string
+          variable: response_body
+        - value_selector:
+          - osv_query
+          - skipped_json
+          value_type: string
+          variable: skipped_json
+        - value_selector:
+          - osv_query
+          - queryable_count
+          value_type: string
+          variable: queryable_count
+      height: 84
+      id: osv_parse
+      position:
+        x: 1680
+        y: 300
+      positionAbsolute:
+        x: 1680
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1
+    - data:
+        code: "import json\nimport time\n\ntry:\n    import requests  # noqa: PLC0415\
+          \  (sandbox ships requests; proxy env is preconfigured)\nexcept Exception:\
+          \  # pragma: no cover\n    requests = None\n\nKEV_SUBSET = {\n    \"CVE-2021-44228\"\
+          : {\"name\": \"Apache Log4j2\", \"date_added\": \"2021-12-10\", \"required_action\"\
+          : \"Apply updates per vendor instructions.\"},\n    \"CVE-2021-41773\":\
+          \ {\"name\": \"Apache HTTP Server\", \"date_added\": \"2021-10-04\", \"\
+          required_action\": \"Apply updates per vendor instructions.\"},\n    \"\
+          CVE-2023-4863\": {\"name\": \"WebP (multiple products)\", \"date_added\"\
+          : \"2023-09-15\", \"required_action\": \"Apply updates per vendor instructions.\"\
+          },\n}\nKEV_SNAPSHOT = \"2026-08-10T16:19:34.1767Z\"\nKEV_SHA256 = \"89689b4485bf16702a36dde7c901766d56521720f79275425e07a77763e26c73\"\
+          \nRULE_VERSION = \"risk-rules/1.0.0\"\nOSV_SOURCE = \"https://api.osv.dev/v1/querybatch\"\
+          \nKEV_SOURCE = \"https://www.cisa.gov/known-exploited-vulnerabilities-catalog\"\
+          \nDISCLAIMER = (\n    \"This evidence card is generated deterministically.\
+          \ 'no_match' means the \"\n    \"OSV query returned no vulnerability at\
+          \ query time; it is not proof of \"\n    \"safety. KEV snapshot: %s. Data\
+          \ cutoff is visible per source.\" % KEV_SNAPSHOT\n)\n\ndef _resolve_kev_osv_ids():\n\
+          \    \"\"\"Reverse-resolve each pinned KEV CVE through OSV detail lookups\
+          \ (bounded\n    to the three pinned CVEs). Failures degrade to an empty\
+          \ mapping; a missing\n    mapping can only downgrade a conclusion, never\
+          \ fabricate one.\"\"\"\n    resolved = {}\n    if requests is None:\n  \
+          \      return resolved\n    for cve in KEV_SUBSET:\n        try:\n     \
+          \       response = requests.get(\"https://api.osv.dev/v1/vulns/\" + cve,\
+          \ timeout=8)\n            if response.status_code != 200:\n            \
+          \    continue\n            detail = response.json()\n            ids = [detail.get(\"\
+          id\")] + list(detail.get(\"aliases\", []))\n            for vid in ids:\n\
+          \                if isinstance(vid, str) and vid:\n                    resolved[vid]\
+          \ = cve\n        except Exception:\n            continue\n    return resolved\n\
+          \ndef main(components_json: str, osv_queried_at: str, skipped_json: str)\
+          \ -> dict:\n    try:\n        results = json.loads(components_json)\n  \
+          \  except Exception:\n        results = []\n    try:\n        skipped =\
+          \ json.loads(skipped_json)\n    except Exception:\n        skipped = []\n\
+          \    kev_osv_ids = _resolve_kev_osv_ids()\n    cards = []\n    for result\
+          \ in results:\n        index = result.get(\"index\", 0)\n        vulns =\
+          \ result.get(\"vulns\", [])\n        error = result.get(\"error\")\n   \
+          \     if error:\n            state = \"unknown\"\n            reason = \"\
+          OSV query failed: %s\" % error\n        elif vulns:\n            matched\
+          \ = None\n            for vuln in vulns:\n                cve = kev_osv_ids.get(vuln.get(\"\
+          id\"))\n                if cve:\n                    matched = (cve, KEV_SUBSET[cve])\n\
+          \                    break\n            if matched:\n                state\
+          \ = \"known_exploited\"\n                reason = None\n            else:\n\
+          \                state = \"vulnerable_evidence_incomplete\"\n          \
+          \      reason = \"OSV reports vulnerability but no verified CISA KEV match\
+          \ in snapshot %s\" % KEV_SNAPSHOT\n        else:\n            state = \"\
+          no_match\"\n            reason = \"Completed OSV query returned no vulnerability;\
+          \ this is not proof of safety.\"\n        card = {\n            \"component_index\"\
+          : index,\n            \"state\": state,\n            \"reason\": reason,\n\
+          \            \"osv_queried_at\": osv_queried_at,\n            \"kev_snapshot\"\
+          : KEV_SNAPSHOT,\n            \"kev_sha256\": KEV_SHA256,\n            \"\
+          rule_version\": RULE_VERSION,\n            \"sources\": {\"osv\": OSV_SOURCE,\
+          \ \"kev\": KEV_SOURCE},\n            \"vulnerabilities\": vulns,\n     \
+          \       \"disclaimer\": DISCLAIMER,\n        }\n        cards.append(card)\n\
+          \    unknown = []\n    for item in skipped:\n        reason = None\n   \
+          \     if item.get(\"conflict\"):\n            reason = \"version conflict:\
+          \ %s\" % item[\"conflict\"]\n        elif item.get(\"unknown_ecosystem\"\
+          ):\n            reason = \"unknown ecosystem without queryable purl\"\n\
+          \        else:\n            reason = \"not queryable\"\n        unknown.append({\n\
+          \            \"component_index\": item.get(\"index\", 0),\n            \"\
+          state\": \"unknown\",\n            \"reason\": reason,\n            \"osv_queried_at\"\
+          : osv_queried_at,\n            \"kev_snapshot\": KEV_SNAPSHOT,\n       \
+          \     \"kev_sha256\": KEV_SHA256,\n            \"rule_version\": RULE_VERSION,\n\
+          \            \"sources\": {\"osv\": OSV_SOURCE, \"kev\": KEV_SOURCE},\n\
+          \            \"vulnerabilities\": [],\n            \"disclaimer\": DISCLAIMER,\n\
+          \        })\n    cards.extend(unknown)\n    summary = {\"cards\": len(cards),\
+          \ \"known_exploited\": 0, \"vulnerable_evidence_incomplete\": 0, \"no_match\"\
+          : 0, \"unknown\": 0}\n    for card in cards:\n        summary[card[\"state\"\
+          ]] = summary.get(card[\"state\"], 0) + 1\n    return {\n        \"cards_json\"\
+          : json.dumps(cards, ensure_ascii=False, separators=(\",\", \":\")),\n  \
+          \      \"risk_summary_json\": json.dumps(summary, sort_keys=True, separators=(\"\
+          ,\", \":\")),\n    }\n"
+        code_language: python3
+        desc: Cross-reference OSV ids/aliases with the pinned CISA KEV subset; deterministic
+          risk-rules/1.0.0 states.
+        outputs:
+          cards_json:
+            children: null
+            type: string
+          risk_summary_json:
+            children: null
+            type: string
+        selected: false
+        title: KEV cross-reference and risk rules
+        type: code
+        variables:
+        - value_selector:
+          - osv_parse
+          - components_json
+          value_type: string
+          variable: components_json
+        - value_selector:
+          - osv_parse
+          - osv_queried_at
+          value_type: string
+          variable: osv_queried_at
+        - value_selector:
+          - osv_query
+          - skipped_json
+          value_type: string
+          variable: skipped_json
+      height: 84
+      id: kev_rules
+      position:
+        x: 2000
+        y: 300
+      positionAbsolute:
+        x: 2000
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1
+    - data:
+        code: "import json\nimport time\n\nSCHEMA_VERSION = \"evidence-export/1.0.0\"\
+          \nMANIFEST_VERSION = \"run-manifest/1.0.0\"\nEXPORT_VERSION = \"export-contract/1.0.0\"\
+          \n\ndef _safe_cell(value):\n    text = value if isinstance(value, str) else\
+          \ json.dumps(value, ensure_ascii=False)\n    if text.startswith((\"=\",\
+          \ \"+\", \"-\", \"@\")):\n        text = \"'\" + text\n    return text.replace(\"\
+          \\r\", \" \").replace(\"\\n\", \" \")\n\ndef main(cards_json: str, risk_summary_json:\
+          \ str, doc_format: str, processed_at: str, valid: bool = True, error_code:\
+          \ str = \"\") -> dict:\n    try:\n        cards = json.loads(cards_json)\n\
+          \    except Exception:\n        cards = []\n    if not valid:\n        error\
+          \ = {\"code\": error_code or \"SBOM_INVALID\", \"source\": \"dify_preflight\"\
+          , \"claim\": \"Input failed deterministic validation; no risk conclusion\
+          \ is produced.\"}\n        manifest = {\n            \"manifest_version\"\
+          : MANIFEST_VERSION,\n            \"export_contract\": EXPORT_VERSION,\n\
+          \            \"generated_at\": time.strftime(\"%Y-%m-%dT%H:%M:%SZ\", time.gmtime()),\n\
+          \            \"input_format\": doc_format,\n            \"processed_at\"\
+          : processed_at,\n            \"rule_version\": \"risk-rules/1.0.0\",\n \
+          \           \"osv_endpoint\": \"https://api.osv.dev/v1/querybatch\",\n \
+          \           \"state\": \"failed\",\n            \"error\": error,\n    \
+          \        \"unverified_capabilities\": [\"Dify application import/trace recorded\
+          \ separately\", \"No model used\"],\n            \"summary\": {},\n    \
+          \    }\n        return {\n            \"status\": \"failed\",\n        \
+          \    \"evidence_json\": json.dumps({\"schema_version\": SCHEMA_VERSION,\
+          \ \"generated_at\": manifest[\"generated_at\"], \"evidence\": [], \"error\"\
+          : error}, ensure_ascii=False, sort_keys=True),\n            \"evidence_csv\"\
+          : \"\",\n            \"run_manifest_json\": json.dumps(manifest, ensure_ascii=False,\
+          \ sort_keys=True),\n        }\n    evidence = {\n        \"schema_version\"\
+          : SCHEMA_VERSION,\n        \"generated_at\": time.strftime(\"%Y-%m-%dT%H:%M:%SZ\"\
+          , time.gmtime()),\n        \"input_format\": doc_format,\n        \"processed_at\"\
+          : processed_at,\n        \"rule_version\": \"risk-rules/1.0.0\",\n     \
+          \   \"evidence\": cards,\n    }\n    header = [\"component_index\", \"state\"\
+          , \"reason\", \"osv_queried_at\", \"kev_snapshot\", \"vulnerability_ids\"\
+          , \"sources\", \"disclaimer\"]\n    lines = [\",\".join(header)]\n    for\
+          \ card in cards:\n        vids = \";\".join(v[\"id\"] for v in card.get(\"\
+          vulnerabilities\", []))\n        lines.append(\",\".join([\n           \
+          \ _safe_cell(card.get(\"component_index\", \"\")),\n            _safe_cell(card.get(\"\
+          state\", \"\")),\n            _safe_cell(card.get(\"reason\", \"\")),\n\
+          \            _safe_cell(card.get(\"osv_queried_at\", \"\")),\n         \
+          \   _safe_cell(card.get(\"kev_snapshot\", \"\")),\n            _safe_cell(vids),\n\
+          \            _safe_cell(json.dumps(card.get(\"sources\", {}), sort_keys=True)),\n\
+          \            _safe_cell(card.get(\"disclaimer\", \"\")),\n        ]))\n\
+          \    has_unknown = any((card.get(\"state\") == \"unknown\") for card in\
+          \ cards)\n    manifest = {\n        \"manifest_version\": MANIFEST_VERSION,\n\
+          \        \"export_contract\": EXPORT_VERSION,\n        \"generated_at\"\
+          : time.strftime(\"%Y-%m-%dT%H:%M:%SZ\", time.gmtime()),\n        \"input_format\"\
+          : doc_format,\n        \"processed_at\": processed_at,\n        \"rule_version\"\
+          : \"risk-rules/1.0.0\",\n        \"osv_endpoint\": \"https://api.osv.dev/v1/querybatch\"\
+          ,\n        \"state\": \"partial\" if has_unknown else \"completed\",\n \
+          \       \"unverified_capabilities\": [\"Dify application import/trace recorded\
+          \ separately\", \"No model used\"],\n        \"summary\": json.loads(risk_summary_json)\
+          \ if risk_summary_json else {},\n    }\n    return {\n        \"status\"\
+          : manifest[\"state\"],\n        \"evidence_json\": json.dumps(evidence,\
+          \ ensure_ascii=False, sort_keys=True),\n        \"evidence_csv\": \"\\n\"\
+          .join(lines),\n        \"run_manifest_json\": json.dumps(manifest, ensure_ascii=False,\
+          \ sort_keys=True),\n    }\n"
+        code_language: python3
+        desc: Versioned JSON and spreadsheet-safe CSV export with run manifest. Formula
+          prefixes are neutralized.
+        outputs:
+          status:
+            children: null
+            type: string
+          evidence_json:
+            children: null
+            type: string
+          evidence_csv:
+            children: null
+            type: string
+          run_manifest_json:
+            children: null
+            type: string
+        selected: false
+        title: JSON and CSV export
+        type: code
+        variables:
+        - value_selector:
+          - kev_rules
+          - cards_json
+          value_type: string
+          variable: cards_json
+        - value_selector:
+          - kev_rules
+          - risk_summary_json
+          value_type: string
+          variable: risk_summary_json
+        - value_selector:
+          - preflight
+          - doc_format
+          value_type: string
+          variable: doc_format
+        - value_selector:
+          - preflight
+          - processed_at
+          value_type: string
+          variable: processed_at
+        - value_selector:
+          - preflight
+          - valid
+          value_type: boolean
+          variable: valid
+        - value_selector:
+          - preflight
+          - error_code
+          value_type: string
+          variable: error_code
+      height: 84
+      id: export
+      position:
+        x: 2320
+        y: 300
+      positionAbsolute:
+        x: 2320
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1
+    - data:
+        desc: JSON, CSV, preview, and reproducible manifest are returned as explicit
+          Workflow outputs.
+        outputs:
+        - value_selector:
+          - export
+          - status
+          value_type: string
+          variable: status
+        - value_selector:
+          - export
+          - evidence_json
+          value_type: string
+          variable: evidence_json
+        - value_selector:
+          - export
+          - evidence_csv
+          value_type: string
+          variable: evidence_csv
+        - value_selector:
+          - export
+          - run_manifest_json
+          value_type: string
+          variable: run_manifest_json
+        selected: false
+        title: Evidence exports
+        type: end
+      height: 118
+      id: success_end
+      position:
+        x: 2640
+        y: 300
+      positionAbsolute:
+        x: 2640
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1
+    - data:
+        code: "import json\nimport time\n\ndef main(error_type: str = \"unknown\"\
+          ) -> dict:\n    error = {\n        \"code\": \"OSV_UNAVAILABLE\",\n    \
+          \    \"source\": \"dify_http_fail_branch\",\n        \"error_type\": error_type\
+          \ if isinstance(error_type, str) and len(error_type) <= 80 else \"unknown\"\
+          ,\n        \"retryable\": True,\n        \"claim\": \"No risk conclusion\
+          \ was produced; no safety claim is made.\",\n    }\n    evidence = {\n \
+          \       \"schema_version\": \"evidence-export/1.0.0\",\n        \"generated_at\"\
+          : time.strftime(\"%Y-%m-%dT%H:%M:%SZ\", time.gmtime()),\n        \"evidence\"\
+          : [],\n        \"error\": error,\n    }\n    manifest = {\n        \"manifest_version\"\
+          : \"run-manifest/1.0.0\",\n        \"state\": \"failed\",\n        \"error\"\
+          : error,\n    }\n    return {\n        \"status\": \"failed\",\n       \
+          \ \"evidence_json\": json.dumps(evidence, ensure_ascii=False, sort_keys=True),\n\
+          \        \"evidence_csv\": \"\",\n        \"run_manifest_json\": json.dumps(manifest,\
+          \ ensure_ascii=False, sort_keys=True),\n    }\n"
+        code_language: python3
+        desc: Deterministic degraded output after bounded HTTP retries; no error body
+          or uploaded field is reflected.
+        outputs:
+          status:
+            children: null
+            type: string
+          evidence_json:
+            children: null
+            type: string
+          evidence_csv:
+            children: null
+            type: string
+          run_manifest_json:
+            children: null
+            type: string
+        selected: false
+        title: Explicit network failure
+        type: code
+        variables:
+        - value_selector:
+          - osv_http
+          - error_type
+          value_type: string
+          variable: error_type
+      height: 84
+      id: http_failure
+      position:
+        x: 1680
+        y: 700
+      positionAbsolute:
+        x: 1680
+        y: 700
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1
+    - data:
+        desc: Explicit failure result; no vulnerability or safety claim is emitted.
+        outputs:
+        - value_selector:
+          - http_failure
+          - status
+          value_type: string
+          variable: status
+        - value_selector:
+          - http_failure
+          - evidence_json
+          value_type: string
+          variable: evidence_json
+        - value_selector:
+          - http_failure
+          - evidence_csv
+          value_type: string
+          variable: evidence_csv
+        - value_selector:
+          - http_failure
+          - run_manifest_json
+          value_type: string
+          variable: run_manifest_json
+        selected: false
+        title: Failed without claim
+        type: end
+      height: 118
+      id: failure_end
+      position:
+        x: 2000
+        y: 700
+      positionAbsolute:
+        x: 2000
+        y: 700
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: document-extractor
+      id: start-extract
+      source: start
+      sourceHandle: source
+      target: extract
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: document-extractor
+        targetType: code
+      id: extract-preflight
+      source: extract
+      sourceHandle: source
+      target: preflight
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: code
+      id: preflight-osv_query
+      source: preflight
+      sourceHandle: source
+      target: osv_query
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: http-request
+      id: osv_query-osv_http
+      source: osv_query
+      sourceHandle: source
+      target: osv_http
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: http-request
+        targetType: code
+      id: osv_http-success-osv_parse
+      source: osv_http
+      sourceHandle: source
+      target: osv_parse
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: http-request
+        targetType: code
+      id: osv_http-fail-http_failure
+      source: osv_http
+      sourceHandle: fail-branch
+      target: http_failure
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: code
+      id: osv_parse-kev_rules
+      source: osv_parse
+      sourceHandle: source
+      target: kev_rules
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: code
+      id: kev_rules-export
+      source: kev_rules
+      sourceHandle: source
+      target: export
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: end
+      id: export-success_end
+      source: export
+      sourceHandle: source
+      target: success_end
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: end
+      id: http_failure-failure_end
+      source: http_failure
+      sourceHandle: source
+      target: failure_end
+      targetHandle: target
+      type: custom
+      zIndex: 0
+  id: d0959d02-1daa-4147-96bf-2b7486612319
+  name: SBOM Risk Evidence 20260811 019fef
+  type: workflow
+  version: '2026-08-11 02:30:00'
