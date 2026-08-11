@@ -1,0 +1,45 @@
+{
+  "manifest_version": "public-inputs/1.0.0",
+  "retrieved_at": "2026-08-11T07:14:05Z",
+  "sources": {
+    "cyclonedx_license": {
+      "license": "Apache-2.0",
+      "path": "third_party/licenses/CycloneDX-Apache-2.0.txt",
+      "sha256": "6c29f22a4a7385285c6f579ec9f33c5e989f00739d6b257243a0b082ec9447ae",
+      "url": "https://raw.githubusercontent.com/CycloneDX/specification/1.6.2/LICENSE",
+      "version": "CycloneDX 1.6.2"
+    },
+    "kev_feed": {
+      "license": "CC0-1.0",
+      "persisted": false,
+      "sha256": "829e88c10613952a1fd173408fc7b703eb58525fb33cb682752d4af94e130c22",
+      "url": "https://raw.githubusercontent.com/cisagov/kev-data/b82bd290510b1f553dafc6a0d996e6c38305bc66/known_exploited_vulnerabilities.json",
+      "version": "2026.08.10"
+    },
+    "kev_license": {
+      "license": "CC0-1.0",
+      "path": "third_party/licenses/CISA-KEV-CC0-1.0.txt",
+      "sha256": "8dfcf2d0cba33bede386eb470daf2ac08caf6540fc2516baab10dd546f90938a",
+      "url": "https://raw.githubusercontent.com/cisagov/kev-data/b82bd290510b1f553dafc6a0d996e6c38305bc66/LICENSE",
+      "version": "2026.08.10"
+    },
+    "spdx_license": {
+      "license": "CC-BY-3.0",
+      "path": "third_party/licenses/SPDX-CC-BY-3.0.txt",
+      "sha256": "017e38491cccbd2bdb6da0a32a33db9ec245b5dab30fdcd09f2c742c975e5b35",
+      "url": "https://raw.githubusercontent.com/spdx/spdx-spec/v2.3/LICENSE",
+      "version": "SPDX 2.3.0"
+    }
+  },
+  "subset": {
+    "cve_ids": [
+      "CVE-2021-44228",
+      "CVE-2021-41773",
+      "CVE-2023-4863"
+    ],
+    "derived_from": "kev_feed",
+    "path": "data/kev/known_exploited_vulnerabilities_subset_2026-08-10.json",
+    "record_count": 3,
+    "sha256": "89689b4485bf16702a36dde7c901766d56521720f79275425e07a77763e26c73"
+  }
+}

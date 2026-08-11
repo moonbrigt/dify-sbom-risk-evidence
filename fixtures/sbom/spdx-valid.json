@@ -1,0 +1,39 @@
+{
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "name": "spdx-sample",
+  "documentNamespace": "https://example.invalid/spdx/spdx-sample-1",
+  "creationInfo": {
+    "created": "2026-08-10T00:00:00Z",
+    "creators": ["Tool: deterministic-fixture/1.0"]
+  },
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-lodash",
+      "name": "lodash",
+      "versionInfo": "4.17.20",
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/lodash@4.17.20"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-left-pad",
+      "name": "left-pad",
+      "versionInfo": "1.3.0",
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/left-pad@1.3.0"
+        }
+      ]
+    }
+  ]
+}

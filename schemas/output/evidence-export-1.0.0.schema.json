@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/sbom-risk/evidence-export-1.0.0.schema.json",
+  "title": "SBOM Risk Evidence Export 1.0.0",
+  "description": "Versioned evidence export produced by the workflow export node. The success shape carries one card per component; the failure shape carries a stable error object and no cards.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "evidence"],
+  "properties": {
+    "schema_version": {"const": "evidence-export/1.0.0"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "input_format": {"type": ["string", "null"]},
+    "processed_at": {"type": ["string", "null"]},
+    "rule_version": {"type": ["string", "null"]},
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["component_index", "state", "reason", "osv_queried_at", "kev_snapshot", "kev_sha256", "rule_version", "sources", "vulnerabilities", "disclaimer"],
+        "properties": {
+          "component_index": {"type": "integer"},
+          "state": {"enum": ["known_exploited", "vulnerable_evidence_incomplete", "no_match", "unknown"]},
+          "reason": {"type": ["string", "null"]},
+          "osv_queried_at": {"type": "string"},
+          "kev_snapshot": {"type": "string"},
+          "kev_sha256": {"type": "string"},
+          "rule_version": {"type": "string"},
+          "sources": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["osv", "kev"],
+            "properties": {
+              "osv": {"type": "string"},
+              "kev": {"type": "string"}
+            }
+          },
+          "vulnerabilities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id"],
+              "properties": {
+                "id": {"type": "string"},
+                "aliases": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": ["string", "null"]},
+                "details": {"type": ["string", "null"]},
+                "affected": {"type": "array"},
+                "modified": {"type": ["string", "null"]}
+              }
+            }
+          },
+          "disclaimer": {"type": "string"}
+        }
+      }
+    },
+    "error": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "required": ["code", "source", "claim"],
+      "properties": {
+        "code": {"type": "string"},
+        "source": {"type": "string"},
+        "claim": {"type": "string"},
+        "error_type": {"type": "string"},
+        "retryable": {"type": "boolean"}
+      }
+    }
+  }
+}
