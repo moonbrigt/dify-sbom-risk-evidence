@@ -43,7 +43,7 @@
 
 ## Workflow Preview
 
-![Workflow editor on a live Dify 1.16.1 deployment](artifacts/dify/workflow-editor-en.png)
+![Workflow editor on a live Dify 1.16.1 deployment](artifacts/dify/workflow-editor.png)
 
 The editor view of the imported app (evidence capture under `artifacts/dify/`).
 
